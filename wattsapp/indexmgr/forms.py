@@ -4,7 +4,20 @@ from django import forms
 from django.db import transaction
 from models import *
 
-class NewSiteForm(forms.Form):
+class ManualIndexLogger(object):
+
+    def logIndex(self, site, date, meter_value):
+        index_record = SiteDailyProduction.objects.create(
+                site=site,
+                date=date,
+                meter=site.meter,
+                meter_value=meter_value,
+                production=None,
+                source='M',
+            )
+        # index_record.save()
+
+class NewSiteForm(forms.Form, ManualIndexLogger):
 
     name = forms.CharField(max_length=100)
     category = forms.ChoiceField(choices=Site.SITE_CATEGORIES)
@@ -23,7 +36,7 @@ class NewSiteForm(forms.Form):
                 installed=installed,
                 installation_index=index,
             )
-        meter.save()
+        # meter.save()
 
         site = Site.objects.create(
                 name=name,
@@ -31,71 +44,51 @@ class NewSiteForm(forms.Form):
                 installed=installed,
                 meter=meter,
             )
-        site.save()
+        # site.save()
 
-        index_record = SiteIndex.objects.create(
-                site=site,
-                date=installed,
-                meter=meter,
-                meter_value=index,
-                value=0,
-                source='M',
-            )
-        index_record.save()
+        self.logIndex(site, installed, index)
 
-class ChangeMeterForm(forms.Form):
+class ChangeMeterForm(forms.Form, ManualIndexLogger):
 
+    site_id = forms.IntegerField()
     index = forms.IntegerField(min_value=0)
     new_index = forms.IntegerField(min_value=0)
-    date = forms.DateInput()
+    date = forms.DateField()
 
     @transaction.atomic
     def execute(self):
 
-        site = None # TODO get from url
+        site_id = self.cleaned_data['site_id']
+        site = Site.objects.get(id=site_id)
         index = self.cleaned_data['index']
         new_index = self.cleaned_data['new_index']
         date = self.cleaned_data['date']
         
-        index_record = SiteIndex.objects.create(
-                site=site,
-                date=date,
-                meter=site.meter,
-                meter_value=index,
-                value=None,
-                source='M',
-            )
-        index.save()
+        self.logIndex(site, date, index)
 
         site.meter.disposed = date
-        site.meter.save()
+        # site.meter.save()
 
         meter = Meter.objects.create(
                 installed=date,
                 installation_index=new_index,
             )
-        meter.save()
+        # meter.save()
 
         site.meter = meter
         site.save()
 
-class ManualIndexRecordForm(forms.Form):
+class ManualIndexRecordForm(forms.Form, ManualIndexLogger):
 
+    site_id = forms.IntegerField()
     index = forms.IntegerField(min_value=0)
-    date = forms.DateInput()
+    date = forms.DateField()
 
     def execute(self):
 
-        site = None
+        site_id = self.cleaned_data['site_id']
+        site = Site.objects.get(id=site_id)
         index = self.cleaned_data['index']
         date = self.cleaned_data['date']
         
-        index_record = SiteIndex.objects.create(
-                site=site,
-                date=date,
-                meter=site.meter,
-                meter_value=index,
-                value=None,
-                source='M',
-            )
-        index.save()
+        self.logIndex(site, date, index)

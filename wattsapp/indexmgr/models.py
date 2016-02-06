@@ -2,6 +2,7 @@
 
 from __future__ import unicode_literals
 
+from django.core.exceptions import ValidationError
 from django.db import models
 
 class Meter(models.Model):
@@ -33,22 +34,14 @@ class Site(models.Model):
 
     def last_index(self):
         try:
-            return SiteIndex.objects.filter(site=self).latest('date')
-        except SiteIndex.DoesNotExist:
+            return SiteDailyProduction.objects.filter(site=self).latest('date')
+        except SiteDailyProduction.DoesNotExist:
             return None
 
 class SiteDailyProduction(models.Model):
     """ Enregistrement journalier de la production
         de chaque site
-    """
-    
-    id = models.AutoField(primary_key=True)
-    site = models.ForeignKey(Site)
-    date = models.DateField()
-    value = models.PositiveIntegerField()
 
-class SiteIndex(models.Model):
-    """ Relevé journalier des index de chaque site.
         Le relevé peut être alimenté :
         1. manuellement
         2. par un import de données
@@ -67,23 +60,41 @@ class SiteIndex(models.Model):
     date = models.DateField()
     meter = models.ForeignKey(Meter)
     meter_value = models.PositiveIntegerField()
-    value = models.PositiveIntegerField()
+    index = models.PositiveIntegerField()
     source = models.CharField(max_length=1, choices=INDEX_SOURCES)
+    production = models.PositiveIntegerField(null=True)
+
+    def compute_new_index(self):
+        previous = self.site.last_index()
+        if previous is None:
+            self.index = 0
+        else:
+            if self.meter.id == previous.meter.id:
+                self.index = previous.index + (self.meter_value - previous.meter_value)
+            else:
+                self.index = previous.index + (self.meter_value - self.meter.installation_index)
+        return self.index
 
     def validate(self):
 
         # R1: la date d'un index ne doit pas être antérieure
         #     à la date de pose du compteur
         if (self.date < self.meter.installed):
-            raise Exception('Date antérieure à la pose du compteur')
+            raise ValidationError("Date antérieure à la pose du compteur")
 
         # R2: la valeur d'un index entrée manuellement
         #     ne doit pas être inférieure à la valeur du dernier index
         previous = self.site.last_index()
-        if (self.source == 'M' and previous and self.value < previous.value):
-            raise Exception('Index plus petit que le prédédent')
+        if previous and self.source == 'M':
+            if self.meter.id == previous.meter.id:
+                if self.meter_value < previous.meter_value:
+                    raise ValidationError("Index plus petit que le prédédent")
+            else:
+                if self.meter_value < self.meter.installation_index:
+                    raise ValidationError("Index plus petit que l'index d'installation du compteur")
 
     def save(self, *args, **kwargs):
         self.validate()
-        super(SiteIndex, self).save(*args, **kwargs)
+        self.compute_new_index()
+        super(SiteDailyProduction, self).save(*args, **kwargs)
 

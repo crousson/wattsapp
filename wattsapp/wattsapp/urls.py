@@ -1,3 +1,4 @@
+# coding: utf-8
 """wattsapp URL Configuration
 
 The `urlpatterns` list routes URLs to views. For more information please see:
@@ -15,7 +16,10 @@ Including another URLconf
 """
 from django.conf.urls import url
 from django.contrib import admin
+from indexmgr import views
 
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
+    url(r'^sites/$', views.SiteListView.as_view(), name="Liste des sites"),
+    url(r'^sites/create$', views.NewSiteFormView.as_view(), name=u"Création d'un nouveau site")
 ]

@@ -3,6 +3,7 @@
 from django import forms
 from django.db import transaction
 from models import *
+from . import services
 
 class ManualIndexLogger(object):
 
@@ -16,6 +17,7 @@ class ManualIndexLogger(object):
                 source='M',
             )
         # index_record.save()
+        services.compute_index_values_around(site, index_record)
 
 class NewSiteForm(forms.Form, ManualIndexLogger):
 

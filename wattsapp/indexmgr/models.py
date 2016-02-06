@@ -32,12 +32,6 @@ class Site(models.Model):
     installed = models.DateField()
     meter = models.ForeignKey(Meter)
 
-    def last_index(self):
-        try:
-            return SiteDailyProduction.objects.filter(site=self).latest('date')
-        except SiteDailyProduction.DoesNotExist:
-            return None
-
 class SiteDailyProduction(models.Model):
     """ Enregistrement journalier de la production
         de chaque site
@@ -64,10 +58,28 @@ class SiteDailyProduction(models.Model):
     source = models.CharField(max_length=1, choices=INDEX_SOURCES)
     production = models.PositiveIntegerField(null=True)
 
+    def previous(self):
+        try:
+            return (SiteDailyProduction.objects
+                .filter(site=self.site, date__lt=self.date, source__in=('I', 'M'))
+                .latest('date'))
+        except SiteDailyProduction.DoesNotExist:
+            return None
+
+    def next(self):
+        try:
+            return (SiteDailyProduction.objects
+                .filter(site=self.site, date__gt=self.date, source__in=('I', 'M'))
+                .order_by('date')
+                .first())
+        except SiteDailyProduction.DoesNotExist:
+            return None
+
     def compute_new_index(self):
-        previous = self.site.last_index()
+        previous = self.previous()
         if previous is None:
             self.index = 0
+            self.production = 0
         else:
             if self.meter.id == previous.meter.id:
                 self.index = previous.index + (self.meter_value - previous.meter_value)
@@ -84,7 +96,7 @@ class SiteDailyProduction(models.Model):
 
         # R2: la valeur d'un index entrée manuellement
         #     ne doit pas être inférieure à la valeur du dernier index
-        previous = self.site.last_index()
+        previous = self.previous()
         if previous and self.source == 'M':
             if self.meter.id == previous.meter.id:
                 if self.meter_value < previous.meter_value:
@@ -94,7 +106,8 @@ class SiteDailyProduction(models.Model):
                     raise ValidationError("Index plus petit que l'index d'installation du compteur")
 
     def save(self, *args, **kwargs):
-        self.validate()
-        self.compute_new_index()
+        if not self.id:
+            self.validate()
+            self.compute_new_index()
         super(SiteDailyProduction, self).save(*args, **kwargs)
 

@@ -9,7 +9,7 @@ from . import services
 
 from datetime import date
 
-class SiteTestCase(TestCase):
+class BaseSiteTestCase(TestCase):
 
     def setUp(self):
         f = forms.NewSiteForm({
@@ -20,33 +20,27 @@ class SiteTestCase(TestCase):
             })
         self.assertTrue(f.is_valid())
         f.execute()
+        self.site = models.Site.objects.first()
+
+    def last_index(self):
+        return models.SiteDailyProduction.objects.filter(site=self.site).first()
+
+class SiteTestCase(BaseSiteTestCase):
 
     def test_create_site(self):
-        """
-        """
-        site = models.Site.objects.first()
+
+        site = self.site
         self.assertEqual(site.name, 'Nouveau site')
         
         # New meter got associated with new site
-        self.assertIsNotNone(site.meter)
+        self.assertIsNotNone(site.meter, "New meter must be created with new site")
         self.assertEqual(site.meter.installation_index, 200)
         
-        # Global index starts at 0
-        self.assertIsNotNone(site.last_index())
-        self.assertEqual(site.last_index().index, 0)
+        index = self.last_index()
+        self.assertIsNotNone(index, "Initial index must be recorded with new site")
+        self.assertEqual(index.index, 0, "Global index must start at 0")
 
-class SiteDailyProductionTestCase(TestCase):
-
-    def setUp(self):
-        f = forms.NewSiteForm({
-                'name':'Nouveau site',
-                'category': 'PV',
-                'index': 100,
-                'installed': '2016-01-01'
-            })
-        self.assertTrue(f.is_valid())
-        f.execute()
-        self.site = models.Site.objects.first()
+class SiteDailyProductionTestCase(BaseSiteTestCase):
 
     def test_r1_valid_date(self):
 
@@ -74,23 +68,23 @@ class SiteDailyProductionTestCase(TestCase):
     def test_r2_monotonic_index(self):
         
         # Given an index value greater than last recorded value
-        # When I create a new index record
-        # Then the new index is recorded
-        models.SiteDailyProduction.objects.create(
-                site=self.site,
-                meter=self.site.meter,
-                meter_value=self.site.last_index().meter_value + 10,
-                date=date(2016, 1, 5),
-                source='M'
-            )
-
-        # Given an index value greater equal to last recorded value
         # When I create a new manual index record
         # Then the new index is recorded
         models.SiteDailyProduction.objects.create(
                 site=self.site,
                 meter=self.site.meter,
-                meter_value=self.site.last_index().meter_value,
+                meter_value=self.last_index().meter_value + 10,
+                date=date(2016, 1, 5),
+                source='M'
+            )
+
+        # Given an index value equal to last recorded value
+        # When I create a new manual index record
+        # Then the new index is recorded
+        models.SiteDailyProduction.objects.create(
+                site=self.site,
+                meter=self.site.meter,
+                meter_value=self.last_index().meter_value,
                 date=date(2016, 1, 5),
                 source='M'
             )
@@ -102,7 +96,7 @@ class SiteDailyProductionTestCase(TestCase):
             models.SiteDailyProduction.objects.create(
                     site=self.site,
                     meter=self.site.meter,
-                    meter_value=self.site.last_index().meter_value - 10,
+                    meter_value=self.last_index().meter_value - 10,
                     date=date(2016, 1, 5),
                     source='M'
                 )
@@ -140,7 +134,41 @@ class SiteDailyProductionTestCase(TestCase):
                 source='M'
             )
 
-class ComputeMissingIndexValuesTestCase(TestCase):
+class ManualIndexRecordTestCase(BaseSiteTestCase):
+    
+    def test_record_manual_index(self):
+        before_count = models.SiteDailyProduction.objects.filter(site=self.site).count()
+        f = forms.ManualIndexRecordForm({
+                'site_id': self.site.id,
+                'index': 300,
+                'date': '2016-01-10'
+            })
+        self.assertTrue(f.is_valid())
+        f.execute()
+        self.assertEqual(
+            models.SiteDailyProduction.objects.filter(site=self.site).count(),
+            before_count+9)
+
+
+class ChangeMeterTestCase(BaseSiteTestCase):
+    
+    def test_changer_meter(self):
+        before_count = models.Meter.objects.count()
+        before_meter_id = self.site.meter.id
+        f = forms.ChangeMeterForm({
+                'site_id': self.site.id,
+                'index': 200,
+                'new_index': 1000,
+                'date': '2016-01-20'
+            })
+        self.assertTrue(f.is_valid())
+        f.execute()
+        self.site = models.Site.objects.get(id=self.site.id)
+        self.assertEqual(models.Meter.objects.count(), before_count+1)
+        self.assertNotEqual(before_meter_id, self.site.meter.id)
+        self.assertEqual(self.site.meter.installation_index, 1000)
+
+class CompleteScenarioTestCase(BaseSiteTestCase):
 
     def setUp(self):
 
@@ -156,7 +184,7 @@ class ComputeMissingIndexValuesTestCase(TestCase):
         f.execute()
         self.site = models.Site.objects.first()
         self.assertIsNotNone(self.site)
-        self.assertEqual(self.site.last_index().index, 0)
+        self.assertEqual(self.last_index().index, 0)
 
         # 2. L'utilisateur saisit un index de 100 à la date du 10 janvier 2016
         f = forms.ManualIndexRecordForm({
@@ -197,10 +225,18 @@ class ComputeMissingIndexValuesTestCase(TestCase):
         f.execute()
 
     def test_compute_missing_values(self):
-        services.compute_missing_index_values(self.site)
-        for index in models.SiteDailyProduction.objects.filter(site=self.site).order_by('date'):
-            print index.site.id, index.date, index.meter_value, index.index, index.production
+
         self.assertEquals(
             models.SiteDailyProduction.objects.filter(site=self.site).count(),
-            41)
+            41,
+            "Il doit y avoir un enregistrement par jour")
+
+        previous = None
+
+        for index in models.SiteDailyProduction.objects.filter(site=self.site).order_by('date'):
+            if previous:
+                self.assertTrue(
+                    index.index >= previous.index,
+                    "L'index global doit être monotone")
+            previous = index
 

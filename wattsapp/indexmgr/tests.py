@@ -22,8 +22,18 @@ class BaseSiteTestCase(TestCase):
         f.execute()
         self.site = models.Site.objects.first()
 
+    def create_record_index(self, meter_value, index_date, source='M'):
+        return models.SiteDailyProduction.objects.create(
+                site=self.site,
+                date=index_date,
+                meter=self.site.meter,
+                meter_value=meter_value,
+                production=None,
+                source=source,
+            )
+
     def last_index(self):
-        return models.SiteDailyProduction.objects.filter(site=self.site).first()
+        return models.SiteDailyProduction.objects.filter(site=self.site).latest('date')
 
 class SiteTestCase(BaseSiteTestCase):
 
@@ -85,7 +95,7 @@ class SiteDailyProductionTestCase(BaseSiteTestCase):
                 site=self.site,
                 meter=self.site.meter,
                 meter_value=self.last_index().meter_value,
-                date=date(2016, 1, 5),
+                date=date(2016, 1, 6),
                 source='M'
             )
 
@@ -98,6 +108,18 @@ class SiteDailyProductionTestCase(BaseSiteTestCase):
                     meter=self.site.meter,
                     meter_value=self.last_index().meter_value - 10,
                     date=date(2016, 1, 5),
+                    source='M'
+                )
+
+        # Given a date prior to last recorded index
+        # When I create a new manual index record for that date
+        # Then I get a validation error
+        with self.assertRaises(ValidationError):
+            models.SiteDailyProduction.objects.create(
+                    site=self.site,
+                    meter=self.site.meter,
+                    meter_value=self.last_index().meter_value + 10,
+                    date=date(2016, 1, 3),
                     source='M'
                 )
 
@@ -163,10 +185,56 @@ class ChangeMeterTestCase(BaseSiteTestCase):
             })
         self.assertTrue(f.is_valid())
         f.execute()
-        self.site = models.Site.objects.get(id=self.site.id)
+        self.site.refresh_from_db()
         self.assertEqual(models.Meter.objects.count(), before_count+1)
         self.assertNotEqual(before_meter_id, self.site.meter.id)
         self.assertEqual(self.site.meter.installation_index, 1000)
+
+class ServiceTestCase(BaseSiteTestCase):
+
+    def setUp(self):
+
+        super(ServiceTestCase, self).setUp()
+        self.t1 = self.create_record_index(300, date(2016,1,10))
+        self.t2 = self.create_record_index(500, date(2016,1,20))
+
+    def test_interpolate_index_between(self):
+        """ Given two consecutive index records t1 and t2 10 days apart
+            When I compute intermediate records from t1 to t2
+            Then 9 (= 10 - 1) computed records are created
+                 and t2 daily production is updated accordingly
+        """
+        before_count = models.SiteDailyProduction.objects.count()
+        new_records = services.interpolate_index_between(self.t1, self.t2)
+        self.assertEqual(new_records, 9)
+        self.assertEqual(models.SiteDailyProduction.objects.count(), before_count+new_records)
+        self.t2.refresh_from_db()
+        self.assertEqual(self.t2.production, 20)
+        p = models.SiteDailyProduction.objects.filter(
+            site=self.t2.site,
+            date__lt=self.t2.date).order_by('-date').first()
+        self.assertEqual(p.source, 'C')
+
+    def test_interpolate_index_between_nonconsecutive(self):
+        """ Given two index records t0 and t2 not consecutive to each other
+            When I compute intermediate records from t0 to t2
+            Then I get an error
+        """
+        t0 = self.t1.previous()
+        with self.assertRaises(AssertionError):
+            services.interpolate_index_between(t0, self.t2)
+
+    def test_compute_missing_index_values(self):
+        """  Given an index record t1 9 days after the previous record
+             When I compute intermediate records before t1
+             Then 8 new computed records are created
+        """
+        before_count = models.SiteDailyProduction.objects.count()
+        services.compute_missing_index_values(self.t1)
+        self.assertEqual(models.SiteDailyProduction.objects.count(), before_count+8)
+        self.t1.refresh_from_db()
+        self.assertEqual(self.t1.production, 11)
+        
 
 class CompleteScenarioTestCase(BaseSiteTestCase):
 
@@ -224,7 +292,7 @@ class CompleteScenarioTestCase(BaseSiteTestCase):
         self.assertTrue(f.is_valid())
         f.execute()
 
-    def test_compute_missing_values(self):
+    def test_for_intermediate_index_records(self):
 
         self.assertEquals(
             models.SiteDailyProduction.objects.filter(site=self.site).count(),

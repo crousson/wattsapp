@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% load bootstrap3 %}
+
+{% block title %}Liste des sites{% endblock %}
+
+{% block content %}
+<div class="row">
+	<div class="col-md-6">
+
+		<ul class="list-group">
+		{% for site in object_list %}
+			<li class="list-group-item">
+				<a href="/site/{{ site.id }}">{{ site.name }}</a>
+			</li>
+		{% empty %}
+			<li class="list-group-item">Aucun site répertorié.</li>
+		{% endfor %}
+		</ul>
+
+		<a href="/sites/create" class="btn btn-primary">
+			Ajouter un site
+		</a>
+
+	</div>
+</div>
+{% endblock %}

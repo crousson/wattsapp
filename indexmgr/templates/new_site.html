@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% load bootstrap3 %}
+
+{% block title %}Déclarer un nouveau site{% endblock %}
+
+{% block content %}
+<div class="row">
+	<div class="col-md-6">
+		<form action="" method="POST" class="form">
+			{% csrf_token %}
+			{% bootstrap_form form %}
+			{% buttons %}
+			<button type="submit" class="btn btn-primary">
+			  {% bootstrap_icon "plus-sign" %} Créer
+			</button>
+			<a class="btn" href="/sites/">Annuler</a>
+			{% endbuttons %}
+		</form>
+	</div>
+</div>
+{% endblock %}

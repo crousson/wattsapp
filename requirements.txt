@@ -1,3 +1,4 @@
 django==1.9.2
 django-dev==0.1.4
+django-bootstrap3==6.2.2
 gunicorn==19.4.5

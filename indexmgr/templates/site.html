@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% load bootstrap3 %}
+
+{% block title %}Relevé du site « {{ object.name }} »{% endblock %}
+
+{% block content %}
+<div class="row">
+	<div class="col-md-9">
+
+		<p>
+			<label>Type de site :</label>
+			<span>{{ object.category }}</span>
+		</p>
+
+		{% buttons %}
+		<a class="btn btn-primary" href="/site/{{ object.id }}/add_index">
+			{% bootstrap_icon "plus-sign" %}
+			Saisir un relevé manuel
+		</a>
+		<a class="btn btn-primary" href="/site/{{ object.id }}/change_meter">
+			{% bootstrap_icon "wrench" %}
+			Changer de compteur
+		</a>
+		<a class="btn btn-default" href="/sites/">
+			{% bootstrap_icon "circle-arrow-left" %}
+			Retour à la liste des sites
+		</a>
+		{% endbuttons %}
+
+		<table class="table table-bordered table-striped">
+			<thead>
+				<tr>
+					<th>Date</th>
+					<th>Type de relevé</th>
+					<th>Index compteur</th>
+					<th>Production du jour</th>
+					<th>Production cumulée</th>
+				</tr>
+			</thead>
+			<tbody>
+			{% for record in productions%}
+				<tr>
+					<td>{{ record.date | date:'c' }}</td>
+					<td>{{ record.source }}</td>
+					<td>{{ record.meter_value }}</td>
+					<td>{{ record.production }}</td>
+					<td>{{ record.index }}</td>
+				</tr>
+			{% endfor %}
+			</tbody>
+		</table>
+
+	</div>
+</div>
+{% endblock %}

@@ -19,7 +19,11 @@ from django.contrib import admin
 from indexmgr import views
 
 urlpatterns = [
+    url(r'^$', views.index),
     url(r'^admin/', admin.site.urls),
     url(r'^sites/$', views.SiteListView.as_view(), name="Liste des sites"),
-    url(r'^sites/create$', views.NewSiteFormView.as_view(), name=u"Création d'un nouveau site")
+    url(r'^sites/create$', views.NewSiteFormView.as_view(), name=u"Création d'un nouveau site"),
+    url(r'^site/(?P<pk>\d+)$', views.SiteDetailView.as_view(), name=u"Relevé de production"),
+    url(r'^site/(?P<pk>\d+)/add_index$', views.ManualIndexRecordFormView.as_view(), name=u"Enregistrer un relevé manuel"),
+    url(r'^site/(?P<pk>\d+)/change_meter$', views.ChangeMeterFormView.as_view(), name=u"Changer le compteur"),
 ]

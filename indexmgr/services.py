@@ -1,25 +1,47 @@
 # coding: utf-8
 
-""" Couche de services métiers """
+""" Services métiers """
 
 from . import models
 from datetime import timedelta
 
 ONE_DAY = timedelta(1)
 
-def compute_missing_index_values(index):
-    """ Calcule les valeurs manquantes
-        entre le relevé (index) et le relevé manuel
-        ou importé précédent.
+def recompute_all_indices(site):
+    """ Recalcule tous les relevés calculés
+        pour le site donné.
+        Retourne le nombre de relevés modifiés.
     """
 
-    # next = pivot.next()
-    # if next:
-    #     interpolate_index_between(site, index, next)
+    next = None
+    count = 0
+
+    records = (models.SiteDailyProduction.objects
+        .filter(site=site,source__in=('M', 'I'))
+        .order_by('-date'))
+
+    for record in records:
+        if next:
+            count += interpolate_index_between(record, next)
+        next = record
+
+    return count
+
+
+def update_computed_indices_from(index):
+    """ Calcule les valeurs intermédiaires
+        entre le relevé (index) et les relevés manuels
+        ou importés précédent et suivant.
+    """
+
+    next = index.next()
+    if next:
+        interpolate_index_between(index, next)
 
     previous = index.previous()
     if previous:
         interpolate_index_between(previous, index)
+
 
 def interpolate_index_between(t1, t2):
     """ Calcule les relevés manquants entre le relevé t1
@@ -27,6 +49,7 @@ def interpolate_index_between(t1, t2):
         des valeurs des index en t1 et t2
         (production journalière uniforme).
         t1 doit être antérieur à t2.
+        Retourne le nombre de relevés créés ou modifiés.
     """
 
     if t1.date >= t2.date:
@@ -46,20 +69,39 @@ def interpolate_index_between(t1, t2):
     t2.save()
     count = 0
 
-    while date > t1.date:
-        # TODO check record does not already exist ?
-        models.SiteDailyProduction.objects.create(
-                site=t2.site,
-                date=date,
-                meter=t2.meter,
-                meter_value=meter_value,
-                index=index,
-                production=daily_production,
-                source='C',
-            )
+    existing_records = (models.SiteDailyProduction.objects
+        .filter(site=t2.site,date__gte=t1.date,date__lt=t2.date)
+        .order_by('-date'))
+
+    for record in existing_records:
+
+        # 1. Create missing records
+        while date > record.date:
+            models.SiteDailyProduction.objects.create(
+                    site=t2.site,
+                    date=date,
+                    meter=t2.meter,
+                    meter_value=meter_value,
+                    index=index,
+                    production=daily_production,
+                    source='C',
+                )
+            date = date - ONE_DAY
+            meter_value = meter_value - daily_production
+            index = index - daily_production
+            count = count + 1
+
+        # 2. Update existing ones
+        if record.source == 'C' and date > t1.date:
+            record.save(
+                    meter_value=meter_value,
+                    index=index,
+                    production=daily_production,
+                )
+            count = count + 1
+
         date = date - ONE_DAY
         meter_value = meter_value - daily_production
         index = index - daily_production
-        count = count + 1
 
     return count

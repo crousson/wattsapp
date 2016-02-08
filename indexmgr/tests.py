@@ -19,8 +19,7 @@ class BaseSiteTestCase(TestCase):
                 'installed': '2016-01-01'
             })
         self.assertTrue(f.is_valid())
-        f.execute()
-        self.site = models.Site.objects.first()
+        self.site = f.execute()
 
     def create_record_index(self, meter_value, index_date, source='M'):
         return models.SiteDailyProduction.objects.create(
@@ -35,18 +34,25 @@ class BaseSiteTestCase(TestCase):
     def last_index(self):
         return models.SiteDailyProduction.objects.filter(site=self.site).latest('date')
 
-class SiteTestCase(BaseSiteTestCase):
+class NewSiteFormTestCase(TestCase):
 
-    def test_create_site(self):
-
-        site = self.site
+    def test_new_site_form(self):
+        f = forms.NewSiteForm({
+                'name':'Nouveau site',
+                'category': 'PV',
+                'index': 200,
+                'installed': '2016-01-01'
+            })
+        self.assertTrue(f.is_valid())
+        site = f.execute()
+        
         self.assertEqual(site.name, 'Nouveau site')
         
         # New meter got associated with new site
         self.assertIsNotNone(site.meter, "New meter must be created with new site")
         self.assertEqual(site.meter.installation_index, 200)
         
-        index = self.last_index()
+        index = site.last_index()
         self.assertIsNotNone(index, "Initial index must be recorded with new site")
         self.assertEqual(index.index, 0, "Global index must start at 0")
 
@@ -60,7 +66,7 @@ class SiteDailyProductionTestCase(BaseSiteTestCase):
         models.SiteDailyProduction.objects.create(
                 site=self.site,
                 meter=self.site.meter,
-                meter_value=110,
+                meter_value=310,
                 date=date(2016, 1, 5)
             )
 
@@ -71,7 +77,7 @@ class SiteDailyProductionTestCase(BaseSiteTestCase):
             models.SiteDailyProduction.objects.create(
                     site=self.site,
                     meter=self.site.meter,
-                    meter_value=110,
+                    meter_value=310,
                     date=date(2015, 12, 5)
                 )        
 
@@ -107,7 +113,7 @@ class SiteDailyProductionTestCase(BaseSiteTestCase):
                     site=self.site,
                     meter=self.site.meter,
                     meter_value=self.last_index().meter_value - 10,
-                    date=date(2016, 1, 5),
+                    date=date(2016, 1, 7),
                     source='M'
                 )
 
@@ -126,13 +132,14 @@ class SiteDailyProductionTestCase(BaseSiteTestCase):
     def test_r2_monotonic_index_when_meter_changed(self):
 
         # Given the meter changed
-        # and an index value less than the installation index
+        # and the new meter starts at 200 (installation index)
         meter = models.Meter.objects.create(
                 installation_index=200,
                 installed=date(2016, 1, 10)
             )
-        meter_value = 150
         # When I create a new manual index record
+        # with value 150 less than the installation index
+        meter_value = 150
         # Then I get a validation error
         with self.assertRaises(ValidationError):
             models.SiteDailyProduction.objects.create(
@@ -143,10 +150,11 @@ class SiteDailyProductionTestCase(BaseSiteTestCase):
                     source='M'
                 )
 
-        # Given the meter changed and an index value greater than
-        # or equal to the installation index
-        meter_value = 250
+        # Given the meter changed
+        # and the new meter starts at 200 (installation index)
         # When I create a new manual index record
+        # with value 250 greater than the installation index
+        meter_value = 250
         # Then the new index is recorded
         models.SiteDailyProduction.objects.create(
                 site=self.site,
@@ -156,7 +164,7 @@ class SiteDailyProductionTestCase(BaseSiteTestCase):
                 source='M'
             )
 
-class ManualIndexRecordTestCase(BaseSiteTestCase):
+class ManualIndexRecordFormTestCase(BaseSiteTestCase):
     
     def test_record_manual_index(self):
         before_count = models.SiteDailyProduction.objects.filter(site=self.site).count()
@@ -172,7 +180,7 @@ class ManualIndexRecordTestCase(BaseSiteTestCase):
             before_count+9)
 
 
-class ChangeMeterTestCase(BaseSiteTestCase):
+class ChangeMeterFormTestCase(BaseSiteTestCase):
     
     def test_changer_meter(self):
         before_count = models.Meter.objects.count()
@@ -224,16 +232,20 @@ class ServiceTestCase(BaseSiteTestCase):
         with self.assertRaises(AssertionError):
             services.interpolate_index_between(t0, self.t2)
 
-    def test_compute_missing_index_values(self):
+    def test_update_computed_indices_from(self):
         """  Given an index record t1 9 days after the previous record
              When I compute intermediate records before t1
              Then 8 new computed records are created
         """
         before_count = models.SiteDailyProduction.objects.count()
-        services.compute_missing_index_values(self.t1)
-        self.assertEqual(models.SiteDailyProduction.objects.count(), before_count+8)
+        services.update_computed_indices_from(self.t1)
+        self.assertEqual(models.SiteDailyProduction.objects.count(), before_count+17)
         self.t1.refresh_from_db()
         self.assertEqual(self.t1.production, 11)
+
+    def test_recompute_all_indices(self):
+        count = services.recompute_all_indices(self.site)
+        self.assertEqual(count, 17)
         
 
 class CompleteScenarioTestCase(BaseSiteTestCase):

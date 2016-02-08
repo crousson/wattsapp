@@ -40,6 +40,9 @@ class Site(models.Model):
     meter = models.ForeignKey(Meter,
         help_text="Compteur associé au site")
 
+    def last_index(self):
+        return SiteDailyProduction.objects.filter(site=self).latest('date')
+
 class SiteDailyProduction(models.Model):
     """ Enregistrement journalier de la production
         de chaque site
@@ -70,7 +73,7 @@ class SiteDailyProduction(models.Model):
 
     def previous(self):
         """ Retourne le relevé manuel ou importé
-            le plus récent avant ce celui-ci
+            le plus récent avant celui-ci
         """
         try:
             return (SiteDailyProduction.objects
@@ -109,9 +112,6 @@ class SiteDailyProduction(models.Model):
             Sinon, retourne la valuer de l'index global enregistré.
         """
 
-        if self.id:
-            return self.index
-
         previous = self.previous()
         if previous is None:
             self.index = 0
@@ -125,40 +125,45 @@ class SiteDailyProduction(models.Model):
 
     def validate(self):
         """ Vérification des règles métiers :
-            - R1: la date d'un index ne doit pas être antérieure
-              à la date de pose du compteur
-            - R1bis: la date d'un index ne doit pas être antérieure
-                     à la date du dernier index
-            - R2: la valeur d'un index entrée manuellement
-                  ne doit pas être inférieure à la valeur du dernier index
+            - R1.1: la date d'un index ne doit pas être antérieure
+                    à la date de pose du compteur
+            - R1.2: la valeur d'un index
+                    ne doit pas être inférieure à l'index d'installation du compteur
+            - R2.1: la valeur d'un index entrée manuellement
+                    ne doit pas être inférieure à la valeur de l'index précédent
+            - R2.2: la valeur d'un index entrée manuellement
+                    ne doit pas être supérieure à la valeur de l'index suivant
         """
 
-        if self.id:
-            return
+        self.compute_new_index()
 
-        # R1: la date d'un index ne doit pas être antérieure
-        #     à la date de pose du compteur
+        # R1.1: la date d'un index ne doit pas être antérieure
+        #       à la date de pose du compteur
         if (self.date < self.meter.installed):
             raise ValidationError("Index antérieur à la pose du compteur")
 
-        latest = self.latest()
-        if latest and self.source == 'M':
-            # R1bis: la date d'un index ne doit pas être antérieure
-            #        à la date du dernier index
-            if self.date <= latest.date:
-                raise ValidationError("Index antérieur au dernier index")
+        # R1.2: la valeur d'un index
+        #       ne doit pas être inférieure à l'index d'installation du compteur
+        if self.meter_value < self.meter.installation_index:
+            raise ValidationError("Index plus petit que l'index d'installation du compteur")
 
-            # R2: la valeur d'un index entrée manuellement
-            #     ne doit pas être inférieure à la valeur du dernier index
-            if self.meter.id == latest.meter.id:
-                if self.meter_value < latest.meter_value:
-                    raise ValidationError("Index plus petit que le dernier index")
-            else:
-                if self.meter_value < self.meter.installation_index:
-                    raise ValidationError("Index plus petit que l'index d'installation du compteur")
+        # R2.1: la valeur d'un index entrée manuellement
+        #       ne doit pas être inférieure à la valeur de l'index précédent
+        previous = self.previous()
+        if previous and self.index < previous.index:
+            raise ValidationError(
+                "Index %(index)d plus petit que l'index précédent %(previous)d",
+                params={ 'index': self.index, 'previous': previous.index })
+
+        # R2.2: la valeur d'un index entrée manuellement
+        #       ne doit pas être supérieure à la valeur de l'index suivant
+        next = self.next()
+        if next and self.index > next.index:
+            raise ValidationError(
+                "Index %(index)d plus grand que l'index suivant %(next)d",
+                params={ 'index': self.index, 'next': next.index })
 
     def save(self, *args, **kwargs):
         self.validate()
-        self.compute_new_index()
         super(SiteDailyProduction, self).save(*args, **kwargs)
 

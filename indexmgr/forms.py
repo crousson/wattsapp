@@ -71,7 +71,7 @@ class ManualIndexLogger(object):
                 source='M',
             )
         # index_record.save()
-        services.compute_missing_index_values(record)
+        services.update_computed_indices_from(record)
 
 class NewSiteForm(ManualIndexLogger, forms.Form):
     """ Création d'un nouveau site :

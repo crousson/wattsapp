@@ -1,0 +1,29 @@
+<h1>Listing meter_readings</h1>
+
+<table>
+  <tr>
+    <th>Date</th>
+    <th>Value</th>
+    <th>V-Index</th>
+    <th>Meter</th>
+    <th></th>
+    <th></th>
+    <th></th>
+  </tr>
+
+<% @meter_readings.each do |meter_reading| %>
+  <tr>
+    <td><%= meter_reading.date %></td>
+    <td><%= meter_reading.value %></td>
+    <td><%= meter_reading.vindex %></td>
+    <td><%= meter_reading.meter_id %></td>
+    <td><%= link_to 'Show', meter_reading %></td>
+    <td><%= link_to 'Edit', edit_meter_reading_path(meter_reading) %></td>
+    <td><%= link_to 'Destroy', meter_reading, method: :delete, data: { confirm: 'Are you sure?' } %></td>
+  </tr>
+<% end %>
+</table>
+
+<br />
+
+<%= link_to 'New Meter reading', new_meter_reading_path %>

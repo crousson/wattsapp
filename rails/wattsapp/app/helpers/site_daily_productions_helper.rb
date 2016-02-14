@@ -1,0 +1,2 @@
+module SiteDailyProductionsHelper
+end

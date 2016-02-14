@@ -1,0 +1,20 @@
+<p id="notice"><%= notice %></p>
+
+<p>
+  <b>Production:</b>
+  <%= @site_daily_production.production %>
+</p>
+
+<p>
+  <b>Date:</b>
+  <%= @site_daily_production.date %>
+</p>
+
+<p>
+  <b>Site:</b>
+  <%= @site_daily_production.site %>
+</p>
+
+
+<%= link_to 'Edit', edit_site_daily_production_path(@site_daily_production) %> |
+<%= link_to 'Back', site_daily_productions_path %>

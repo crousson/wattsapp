@@ -1,0 +1,25 @@
+<p id="notice"><%= notice %></p>
+
+<p>
+  <b>Installation index:</b>
+  <%= @meter.installation_index %>
+</p>
+
+<p>
+  <b>Installed at:</b>
+  <%= @meter.installed_at %>
+</p>
+
+<p>
+  <b>Disposed at:</b>
+  <%= @meter.disposed_at %>
+</p>
+
+<p>
+  <b>Site:</b>
+  <%= @meter.site %>
+</p>
+
+
+<%= link_to 'Edit', edit_meter_path(@meter) %> |
+<%= link_to 'Back', meters_path %>

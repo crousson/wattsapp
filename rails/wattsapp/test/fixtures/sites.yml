@@ -1,0 +1,15 @@
+# Read about fixtures at http://api.rubyonrails.org/classes/ActiveRecord/Fixtures.html
+
+# one:
+#   name: MyString
+#   lon: 1.5
+#   lat: 1.5
+#   category: MyString
+#   installed_at: 2016-02-09
+
+# two:
+#   name: MyString
+#   lon: 1.5
+#   lat: 1.5
+#   category: MyString
+#   installed_at: 2016-02-09

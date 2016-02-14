@@ -1,0 +1,33 @@
+<%= form_for(@meter) do |f| %>
+  <% if @meter.errors.any? %>
+    <div id="error_explanation">
+      <h2><%= pluralize(@meter.errors.count, "error") %> prohibited this meter from being saved:</h2>
+
+      <ul>
+      <% @meter.errors.full_messages.each do |msg| %>
+        <li><%= msg %></li>
+      <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="field">
+    <%= f.label :installation_index %><br />
+    <%= f.number_field :installation_index %>
+  </div>
+  <div class="field">
+    <%= f.label :installed_at %><br />
+    <%= f.date_select :installed_at %>
+  </div>
+  <div class="field">
+    <%= f.label :disposed_at %><br />
+    <%= f.date_select :disposed_at %>
+  </div>
+  <div class="field">
+    <%= f.label :site %><br />
+    <%= f.text_field :site %>
+  </div>
+  <div class="actions">
+    <%= f.submit %>
+  </div>
+<% end %>

@@ -1,0 +1,20 @@
+<p id="notice"><%= notice %></p>
+
+<p>
+  <b>Date:</b>
+  <%= @meter_reading.date %>
+</p>
+
+<p>
+  <b>Value:</b>
+  <%= @meter_reading.value %>
+</p>
+
+<p>
+  <b>Meter:</b>
+  <%= @meter_reading.meter %>
+</p>
+
+
+<%= link_to 'Edit', edit_meter_reading_path(@meter_reading) %> |
+<%= link_to 'Back', meter_readings_path %>

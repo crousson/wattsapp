@@ -1,0 +1,13 @@
+# Read about fixtures at http://api.rubyonrails.org/classes/ActiveRecord/Fixtures.html
+
+# one:
+#   installation_index: 1
+#   installed_at: 2016-02-09
+#   disposed_at: 2016-02-09
+#   site: 
+
+# two:
+#   installation_index: 1
+#   installed_at: 2016-02-09
+#   disposed_at: 2016-02-09
+#   site: 

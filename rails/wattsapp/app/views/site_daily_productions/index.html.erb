@@ -1,0 +1,27 @@
+<h1>Listing site_daily_productions</h1>
+
+<table>
+  <tr>
+    <th>Production</th>
+    <th>Date</th>
+    <th>Site</th>
+    <th></th>
+    <th></th>
+    <th></th>
+  </tr>
+
+<% @site_daily_productions.each do |site_daily_production| %>
+  <tr>
+    <td><%= site_daily_production.production %></td>
+    <td><%= site_daily_production.date %></td>
+    <td><%= site_daily_production.site %></td>
+    <td><%= link_to 'Show', site_daily_production %></td>
+    <td><%= link_to 'Edit', edit_site_daily_production_path(site_daily_production) %></td>
+    <td><%= link_to 'Destroy', site_daily_production, method: :delete, data: { confirm: 'Are you sure?' } %></td>
+  </tr>
+<% end %>
+</table>
+
+<br />
+
+<%= link_to 'New Site daily production', new_site_daily_production_path %>

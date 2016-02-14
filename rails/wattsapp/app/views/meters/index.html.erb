@@ -1,0 +1,29 @@
+<h1>Listing meters</h1>
+
+<table>
+  <tr>
+    <th>Installation index</th>
+    <th>Installed at</th>
+    <th>Disposed at</th>
+    <th>Site</th>
+    <th></th>
+    <th></th>
+    <th></th>
+  </tr>
+
+<% @meters.each do |meter| %>
+  <tr>
+    <td><%= meter.installation_index %></td>
+    <td><%= meter.installed_at %></td>
+    <td><%= meter.disposed_at %></td>
+    <td><%= meter.site %></td>
+    <td><%= link_to 'Show', meter %></td>
+    <td><%= link_to 'Edit', edit_meter_path(meter) %></td>
+    <td><%= link_to 'Destroy', meter, method: :delete, data: { confirm: 'Are you sure?' } %></td>
+  </tr>
+<% end %>
+</table>
+
+<br />
+
+<%= link_to 'New Meter', new_meter_path %>
